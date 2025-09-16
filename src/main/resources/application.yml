@@ -1,0 +1,27 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: api-gateway
+  profiles:
+    active: dev
+
+  config:
+    import: "configserver:http://localhost:9000"
+
+  cloud:
+    config:
+      username: admin
+      password: admin
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://admin:admin@localhost:8761/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*" # 모든 엔드포인트를 노출
