@@ -7,23 +7,12 @@ spring:
   profiles:
     active: dev
 
-  config:
-    import: "configserver:http://localhost:9000"
-
   cloud:
-    config:
-      username: admin
-      password: admin
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://admin:admin@localhost:8761/eureka/
-    register-with-eureka: true
-    fetch-registry: true
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: gateway
+    kubernetes:
+      config:
+        enabled: true
+        name: user-service-config
+        paths: /workspace/config
+      # 4. K8s Service Discovery 활성화 (Eureka 대체)
+      discovery:
+        enabled: true
