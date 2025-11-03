@@ -21,12 +21,11 @@ public class GatewayConfig {
         return builder.routes()
                 .route("user-service-route", r -> r.path("/user-service/**")
                         .filters(f -> f.stripPrefix(1)
-                                // 헤더 추가 지역 필터 적용
-                                .filters(regionalFilterFactory.apply(new RegionalFilterFactory.Config())))
-                        .uri("lb://user-service"))
+                                .filter(regionalFilterFactory.apply(new RegionalFilterFactory.Config())))
+                        .uri("http://user-service:8081"))
                 .route("order-service-route", r -> r.path("/order-service/**")
                         .filters(f -> f.stripPrefix(1))
-                        .uri("lb://order-service"))
+                        .uri("http://order-service:8082"))
                 .build();
     }
 }
