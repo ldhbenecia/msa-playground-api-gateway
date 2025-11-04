@@ -10,9 +10,6 @@ spring:
   cloud:
     kubernetes:
       config:
-        enabled: true
-        name: api-gateway-config
-        paths: /workspace/config
-      # 4. K8s Service Discovery 활성화 (Eureka 대체)
+        enabled: false
       discovery:
         enabled: true
