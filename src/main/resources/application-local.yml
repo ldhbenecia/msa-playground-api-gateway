@@ -1,0 +1,10 @@
+server:
+  port: 8000
+
+spring:
+  cloud:
+    kubernetes:
+      config:
+        enabled: false
+      discovery:
+        enabled: false

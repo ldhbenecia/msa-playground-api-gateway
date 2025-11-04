@@ -1,15 +1,5 @@
-server:
-  port: 8000
-
 spring:
   application:
     name: api-gateway
   profiles:
-    active: dev
-
-  cloud:
-    kubernetes:
-      config:
-        enabled: false
-      discovery:
-        enabled: true
+    active: local
