@@ -8,3 +8,12 @@ spring:
         enabled: false
       discovery:
         enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics,prometheus"
+  metrics:
+    tags:
+      application: api-gateway
