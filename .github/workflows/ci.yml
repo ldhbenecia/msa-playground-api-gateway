@@ -1,13 +1,14 @@
 name: MSA Api-Gateway CI/CD
 
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'src/**'
-      - 'build.gradle'
-      - 'Dockerfile'
-      - '.github/workflows/ci.yml'
+#  push:
+#    branches: [ "main" ]
+#    paths:
+#      - 'src/**'
+#      - 'build.gradle'
+#      - 'Dockerfile'
+#      - '.github/workflows/ci.yml'
+  workflow_dispatch:
 
 jobs:
   # -----------------------------------------------
