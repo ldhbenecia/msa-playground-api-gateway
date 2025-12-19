@@ -1,6 +1,7 @@
 package com.benecia.api_gateway.config;
 
 import com.benecia.api_gateway.filter.RegionalFilterFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
@@ -12,6 +13,15 @@ public class GatewayConfig {
     // 실습용 지역 필터
     private final RegionalFilterFactory regionalFilterFactory;
 
+    @Value("${msa.client.user-url}")
+    private String userServiceUrl;
+
+    @Value("${msa.client.order-url}")
+    private String orderServiceUrl;
+
+    @Value("${msa.client.product-url}")
+    private String productServiceUrl;
+
     public GatewayConfig(RegionalFilterFactory regionalFilterFactory) {
         this.regionalFilterFactory = regionalFilterFactory;
     }
@@ -22,10 +32,15 @@ public class GatewayConfig {
                 .route("user-service-route", r -> r.path("/user-service/**")
                         .filters(f -> f.stripPrefix(1)
                                 .filter(regionalFilterFactory.apply(new RegionalFilterFactory.Config())))
-                        .uri("http://user-service:8081"))
+                        .uri(userServiceUrl))
+
                 .route("order-service-route", r -> r.path("/order-service/**")
                         .filters(f -> f.stripPrefix(1))
-                        .uri("http://order-service:8082"))
+                        .uri(orderServiceUrl))
+
+                .route("product-service-route", r -> r.path("/product-service/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri(productServiceUrl))
                 .build();
     }
 }

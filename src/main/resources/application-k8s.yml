@@ -1,6 +1,12 @@
 server:
   port: 8000
 
+msa:
+  client:
+    user-url: http://user-service:8081
+    order-url: http://order-service:8082
+    product-url: http://product-service:8083
+
 spring:
   cloud:
     kubernetes:
