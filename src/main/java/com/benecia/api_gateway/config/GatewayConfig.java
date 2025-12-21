@@ -1,5 +1,6 @@
 package com.benecia.api_gateway.config;
 
+import com.benecia.api_gateway.filter.AuthorizationHeaderFilter;
 import com.benecia.api_gateway.filter.RegionalFilterFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.route.RouteLocator;
@@ -10,8 +11,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class GatewayConfig {
 
-    // 실습용 지역 필터
     private final RegionalFilterFactory regionalFilterFactory;
+    private final AuthorizationHeaderFilter authorizationHeaderFilter;
 
     @Value("${msa.client.user-url}")
     private String userServiceUrl;
@@ -22,8 +23,10 @@ public class GatewayConfig {
     @Value("${msa.client.product-url}")
     private String productServiceUrl;
 
-    public GatewayConfig(RegionalFilterFactory regionalFilterFactory) {
+    public GatewayConfig(RegionalFilterFactory regionalFilterFactory,
+                         AuthorizationHeaderFilter authorizationHeaderFilter) {
         this.regionalFilterFactory = regionalFilterFactory;
+        this.authorizationHeaderFilter = authorizationHeaderFilter;
     }
 
     @Bean
@@ -35,11 +38,13 @@ public class GatewayConfig {
                         .uri(userServiceUrl))
 
                 .route("order-service-route", r -> r.path("/order-service/**")
-                        .filters(f -> f.stripPrefix(1))
+                        .filters(f -> f.stripPrefix(1)
+                                .filter(authorizationHeaderFilter.apply(new AuthorizationHeaderFilter.Config())))
                         .uri(orderServiceUrl))
 
                 .route("product-service-route", r -> r.path("/product-service/**")
-                        .filters(f -> f.stripPrefix(1))
+                        .filters(f -> f.stripPrefix(1)
+                                .filter(authorizationHeaderFilter.apply(new AuthorizationHeaderFilter.Config())))
                         .uri(productServiceUrl))
                 .build();
     }
