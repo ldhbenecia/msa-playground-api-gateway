@@ -1,100 +1,95 @@
-name: MSA Api-Gateway CI/CD
+name: CI/CD
 
 on:
-#  push:
-#    branches: [ "main" ]
-#    paths:
-#      - 'src/**'
-#      - 'build.gradle'
-#      - 'Dockerfile'
-#      - '.github/workflows/ci.yml'
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'src/**'
+      - 'build.gradle'
+      - 'Dockerfile'
+      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
+# 같은 브랜치에 새 커밋이 오면 진행 중인 옛 실행을 취소함
+# 안 그러면 늦게 끝난 옛 빌드가 매니페스트 태그를 옛 커밋으로 덮어씀
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/api-gateway
+  MANIFESTS_REPO: ldhbenecia/ldh-infra-lab-manifests
+  VALUES_PATH: apps/msa/api-gateway/values.yaml
+
 jobs:
-  # -----------------------------------------------
-  # JOB 1: CI (Docker 이미지 빌드 & 푸시)
-  # -----------------------------------------------
-  build-and-push-docker:
-    name: Build and Push Docker Image
-    runs-on: ubuntu-latest
-
+  build-and-push:
+    name: Build and Push Image
+    # 노드가 전부 arm64. amd64 러너에서 QEMU 로 arm64 를 만들면 Gradle 이 몇 배 느려짐
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write          # GHCR push 권한
     outputs:
-      image_tag: ${{ steps.get_sha.outputs.SHORT_SHA }}
-
+      image_tag: ${{ steps.sha.outputs.SHORT_SHA }}
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
+      - name: Get short SHA
+        id: sha
+        run: echo "SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x ./gradlew
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build with Gradle
-        run: ./gradlew build -x test
-
-      - name: Login to Docker Hub
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}    # 자동 제공, 별도 설정 불필요
 
-      - name: Get Git commit short SHA
-        id: get_sha # 2번 Job에서 이 스텝의 출력을 참조하기 위한 ID
-        run: |
-          SHA=$(echo ${GITHUB_SHA} | cut -c1-7)
-          echo "SHORT_SHA=$SHA" >> $GITHUB_ENV
-          echo "SHORT_SHA=$SHA" >> $GITHUB_OUTPUT # 1번 Job의 출력으로 등록
-
-      - name: Build and push Docker image
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/arm64
           push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/msa-playground-api-gateway:${{ env.SHORT_SHA }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/msa-playground-api-gateway:latest
+          tags: ${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.SHORT_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-  # -----------------------------------------------
-  # JOB 2: CD Trigger (Helm 레포지토리의 values.yaml 수정)
-  # -----------------------------------------------
-  update-helm-repository:
-    name: Update Helm Values
-    needs: build-and-push-docker
+  update-manifests:
+    name: Update image tag in manifests
+    needs: build-and-push
     runs-on: ubuntu-latest
-
     steps:
-      # 1. yq (YAML 수정 도구) 설치
-      - name: Install yq (YAML processor)
-        run: sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
-
-      # 2. "HELM_DEPLOY_KEY" (SSH 비밀키)를 사용하여
-      # "msa-playground-helm" 레포지토리를 체크아웃
-      - name: Checkout Helm repository
+      - name: Checkout manifests repo
         uses: actions/checkout@v4
         with:
-          repository: ldhbenecia/msa-playground-helm
-          ssh-key: ${{ secrets.HELM_DEPLOY_KEY }}
-          path: msa-playground-helm
+          repository: ${{ env.MANIFESTS_REPO }}
+          token: ${{ secrets.MANIFESTS_TOKEN }}
+          path: manifests
 
-      # 3. 'api-gateway-chart/values.yaml' 파일의 'image.tag' 값을
-      #    1번 Job의 "출력(output)" 값으로 "수정"
-      - name: Update image tag in values.yaml
-        run: |
-          NEW_TAG=${{ needs.build-and-push-docker.outputs.image_tag }}
-          yq e -i '.image.tag = "'$NEW_TAG'"' msa-playground-helm/api-gateway-chart/values.yaml
+      # 러너에 기본 설치돼 있음. 없으면 여기서 바로 실패함
+      - name: Check yq
+        run: yq --version
 
-      # 4. 수정된 'values.yaml' 파일을
-      # "msa-playground-helm" 레포지토리로 다시 'git push'
-      - name: Commit and push changes to Helm repo
+      - name: Update image tag
         run: |
-          cd msa-playground-helm
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          NEW_TAG=${{ needs.build-and-push.outputs.image_tag }}
+          cd manifests
+          yq e -i ".image.repository = \"${{ env.IMAGE_NAME }}\"" ${{ env.VALUES_PATH }}
+          yq e -i ".image.tag = \"$NEW_TAG\"" ${{ env.VALUES_PATH }}
+          yq e -i '.image.pullPolicy = "IfNotPresent"' ${{ env.VALUES_PATH }}
+          cat ${{ env.VALUES_PATH }} | head -8
+
+      - name: Commit and push
+        run: |
+          cd manifests
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git diff --staged --quiet || git commit -m "ci(api-gateway): Update image tag to ${{ needs.build-and-push-docker.outputs.image_tag }}"
+          git diff --staged --quiet && echo "변경 없음" && exit 0
+          git commit -m "ci(api-gateway): image tag → ${{ needs.build-and-push.outputs.image_tag }}"
+          git pull --rebase
           git push
