@@ -7,6 +7,11 @@ msa:
     order-url: http://order-service:8082
     product-url: http://product-service:8083
 
+# user-service 가 서명한 토큰을 같은 키로 검증함. 값은 배포 쪽 Secret 이 TOKEN_SECRET 으로 넣음
+# 기본값을 두지 않음 — 빠지면 기동 단계에서 실패해야 함
+token:
+  secret: ${TOKEN_SECRET}
+
 spring:
   cloud:
     kubernetes:
