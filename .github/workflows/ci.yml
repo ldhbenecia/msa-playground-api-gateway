@@ -91,5 +91,11 @@ jobs:
           git add .
           git diff --staged --quiet && echo "변경 없음" && exit 0
           git commit -m "ci(api-gateway): image tag → ${{ needs.build-and-push.outputs.image_tag }}"
-          git pull --rebase
-          git push
+          # 4개 서비스 CI 가 같은 레포에 동시에 push 하면, pull 과 push 사이에 다른 CI 가 끼어들 수 있음
+          # → 거부되면 다시 받아서 다시 얹고 재시도
+          for i in 1 2 3 4 5; do
+            git pull --rebase && git push && exit 0
+            echo "push 거부 (${i}회) — 다른 CI 가 먼저 push 함. 재시도"
+            sleep $((i * 3))
+          done
+          exit 1
